@@ -74,8 +74,8 @@ install(TARGETS bebop2cpp LIBRARY DESTINATION lib)
 install(FILES ${INCLUDE_FILES} DESTINATION include/bebop2cpp/)
 
 
-add_executable(houston SNAP/houston.cpp)
-target_link_libraries(houston bebop2cpp)
+add_executable(SNAP_rudi SNAP/SNAP_rudi.cpp)
+target_link_libraries(SNAP_rudi bebop2cpp)
 
 
 #executable sample, may have to fiddle with the font weights if you want this to behave itself
