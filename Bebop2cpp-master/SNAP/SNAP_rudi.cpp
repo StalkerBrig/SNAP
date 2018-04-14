@@ -60,6 +60,7 @@ vector <double*> :: reverse_iterator dprit;
 vector <char> ddirec;
 vector <char> :: iterator ddit;
 vector <char> :: reverse_iterator ddrit;
+bool IsValueInDpos(double *value);
 
 void ReadyToReadScan();
 double ** ReadScanFile(string fn);
@@ -148,6 +149,7 @@ int main(int argc, char *argv[]) {
 	double current_distance;
 	
 	bool currently_reversing = false;
+	bool did_reverse = false;	
 
 	while(getting_info_loop)
 	{	
@@ -161,7 +163,8 @@ int main(int argc, char *argv[]) {
 		nia = ReadScanFile(file_name);
 		
 		//helps readability, hopefully..
-		dpos.push_back(nia[0]);
+		
+		double *nia_position = nia[0];
 		mbd = nia[1][0];
 		mfd = nia[2][0];
 		mld = nia[3][1];
@@ -190,7 +193,7 @@ int main(int argc, char *argv[]) {
 			current_direction = intersection.direction;
 			
 			//looking to see if we are at a new intersection!
-			if ( find(dpos.begin(), dpos.end()-1, nia[0] ) != dpos.end() )
+			if ( !IsValueInDpos(nia_position) )
 			{
 				cout << "????" << endl;
 				ddirec.push_back('x');
@@ -207,6 +210,7 @@ int main(int argc, char *argv[]) {
 			//This means we need to go back through the other paths we did not take yet
 			if( prev_intersection == true )
 			{
+				cout << "AHKKKKKKKK" << endl;
 				//making temp ints for intersection maxes
 				double imbd = mbd;
 				double imfd = mfd;
@@ -216,20 +220,22 @@ int main(int argc, char *argv[]) {
 				//the idea behind this is that we go through all the previous route we
 				// went to at this intersection and make their max 0 (temporarily)
 				// when we do this, we know which new direction to go
-				for (ddrit = ddirec.rbegin(); *ddrit != 'x' || ddrit != ddirec.rend(); ++dprit)
+				for (ddrit = ddirec.rbegin(); *ddrit != 'x' && ddrit != ddirec.rend(); ++ddrit)
 				{
 					ChangeDistance(*ddrit, 0, &imbd, &imfd, &imld, &imrd);
 				}
 				
-				if (imbd == 0 && imfd == 0 && imld == 0 && imrd == 0)
+				intersection = CheckForIntersections(imbd, imfd, imld, imrd, current_direction);
+				
+				current_direction = intersection.direction;
+				
+				if (current_direction == 'n')
 				{
 					cout << "THE DRONE HAS NOWHERE ELSE TO GO! NAVIGATION COMPLETE!" << endl;
 					exit(0);
 				}			
 
-				intersection = CheckForIntersections(imbd, imfd, imld, imrd, current_direction);
 					
-				current_direction = intersection.direction;
 			}
 
 			
@@ -239,10 +245,15 @@ int main(int argc, char *argv[]) {
 			// intersection
 			ddirec.push_back(current_direction);
 		}
+		//need to insert the position after checking the intersection, since
+		// the intersection check looks for it inside. Not a huge deal,
+		// but will be easier since we don't need it til now anyways...
+		// That was a lot of comments for no real good reason.
+		dpos.push_back(nia_position);
 		
 		current_distance = GetDistance(mbd, mfd, mld, mrd, current_direction);
 
-		if( current_distance < WALL_THRESHOLD )
+		if( current_distance <= WALL_THRESHOLD )
 		{
 			cout << "WALLLLLLL!" << endl;
 			current_direction = ReverseDirection(current_direction);
@@ -262,6 +273,7 @@ int main(int argc, char *argv[]) {
 			}
 			cout << "End reversing" << endl;	
 			currently_reversing = false;
+			did_reverse = true;
 		}
 		
 		for(dpit = dpos.begin(); dpit != dpos.end(); dpit++)
@@ -274,9 +286,16 @@ int main(int argc, char *argv[]) {
 			cout << *ddit << endl;
 		}
 		
-
-		cout << "Go: " << current_direction << endl;	
-
+	
+		//just don't want to print out what direction to go twice	
+		if(did_reverse != true)
+		{
+			cout << "Go: " << current_direction << endl;	
+		}
+		else //we did just reverse
+		{
+			did_reverse = false;
+		}
 	
 	}
 
@@ -610,18 +629,18 @@ void ChangeDistance(char cd, double cv, double *mbd, double *mfd, double *mld, d
 			cout << "STOP MESSING THINGS UP!" << endl;
 			break;
 	}
-	
+
+	cout << cv << (*mfd) << (*mbd) << (*mld) << (*mrd) << endl;	
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
+bool IsValueInDpos(double *value)
+{
+	for( dpit = dpos.begin(); dpit != dpos.end(); dpit++)
+	{
+		if( (*dpit)[0] == value[0] && (*dpit)[1] == value[1] )
+		{
+			return true;
+		}
+	}
+	return false;
+}
