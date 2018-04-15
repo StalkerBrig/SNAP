@@ -69,7 +69,8 @@ DistAndDirec FindMaxDistance(double mbd, double mfd, double mld, double mrd);
 DistAndDirec CheckForIntersections(double mbd, double mfd, double mld, double mrd, char cd);
 double GetDistance(double mbd, double mfd, double mld, double mrd, char cd);
 char ReverseDirection(char cd);
-void ChangeDistance(char cd, double cv, double *mbd, double *mfd, double *mld, double *mrd);
+//void ChangeDistance(char cd, double cv, double *mbd, double *mfd, double *mld, double *mrd);
+void ChangeDistance(char cd, double cv, double * dist);
 
 
 /* TODO: Need to uncomment drone code if trying to use drone;
@@ -217,16 +218,34 @@ int main(int argc, char *argv[]) {
 				double imld = mld;
 				double imrd = mrd;
 				
+				double idist[4] = {imbd, imfd, imld, imrd};
+				
 				//the idea behind this is that we go through all the previous route we
 				// went to at this intersection and make their max 0 (temporarily)
 				// when we do this, we know which new direction to go
-				for (ddrit = ddirec.rbegin(); *ddrit != 'x' && ddrit != ddirec.rend(); ++ddrit)
+				for (ddrit = ddirec.rbegin(); ddrit != ddirec.rend() && (*ddrit) != 'x'; ddrit++)
 				{
-					ChangeDistance(*ddrit, 0, &imbd, &imfd, &imld, &imrd);
+					cout << (*ddrit) << endl;
+					ChangeDistance(*ddrit, 0, idist);
 				}
 				
+				imbd = idist[0];
+				imfd = idist[1];
+				imld = idist[2];
+				imrd = idist[3];
+			
+				/*
+					Checking l and f here, since it will basically check all directions at the
+					 intersection. left first since we are prioritizing: left, forward, right
+				*/	
+				current_direction = 'l';
 				intersection = CheckForIntersections(imbd, imfd, imld, imrd, current_direction);
-				
+				if(intersection.direction == 'n')
+				{
+					current_direction = 'f';	
+					intersection = CheckForIntersections(imbd, imfd, imld, imrd, current_direction);
+				}
+
 				current_direction = intersection.direction;
 				
 				if (current_direction == 'n')
@@ -235,9 +254,7 @@ int main(int argc, char *argv[]) {
 					exit(0);
 				}			
 
-					
 			}
-
 			
 			dpos.push_back(INTERSECTION_INDICATOR);
 			
@@ -258,8 +275,9 @@ int main(int argc, char *argv[]) {
 			cout << "WALLLLLLL!" << endl;
 			current_direction = ReverseDirection(current_direction);
 			currently_reversing = true;
-			//want to remove last position, since we need to reverse back
 			dpos.pop_back();
+			//want to remove last position, since we need to reverse back
+			//dpos.pop_back();
 		}
 		
 		if( currently_reversing == true )
@@ -267,15 +285,17 @@ int main(int argc, char *argv[]) {
 			cout << "Begin reversing" << endl;
 			for (dprit = dpos.rbegin(); *dprit != INTERSECTION_INDICATOR; ++dprit)
 			{
-				cout << "Go: " << current_direction << endl;
-				dpos.pop_back();
 				ReadyToReadScan();
+				cout << "Go: " << current_direction << endl;
+				//dpos.pop_back();
 			}
+			
 			cout << "End reversing" << endl;	
 			currently_reversing = false;
 			did_reverse = true;
 		}
-		
+	
+		/*	
 		for(dpit = dpos.begin(); dpit != dpos.end(); dpit++)
 		{	
 			cout << *dpit[0] << endl;
@@ -285,7 +305,7 @@ int main(int argc, char *argv[]) {
 		{
 			cout << *ddit << endl;
 		}
-		
+		*/
 	
 		//just don't want to print out what direction to go twice	
 		if(did_reverse != true)
@@ -393,10 +413,12 @@ double **  ReadScanFile(string fn)
 		}
 	} 
 
+	/*
 	cout << "MBX: " << max_backward_x[0] << " " << max_backward_x[1] << endl;
 	cout << "MFX: " << max_forward_x[0] << " " << max_forward_x[1] << endl;
 	cout << "MLY: " << max_left_y[0] << " " << max_left_y[1] << endl;
 	cout << "MRY: " << max_right_y[0] << " " << max_right_y[1] << endl;
+	*/
 	fin.close();
 
 	double ** max_arrays = new double*[5];
@@ -494,7 +516,7 @@ DistAndDirec FindMaxDistance(double mbd, double mfd, double mld, double mrd)
 			direction = 'r';
 			break;
 		default:
-			cout << "You dun goofed" << endl;
+			cout << "This should be an intersection." << endl;
 			break;
 
 	}
@@ -606,7 +628,8 @@ char ReverseDirection(char cd)
 	cd = current_direction
 	cv = changed value
 */
-void ChangeDistance(char cd, double cv, double *mbd, double *mfd, double *mld, double *mrd)
+//void ChangeDistance(char cd, double cv, double *mbd, double *mfd, double *mld, double *mrd)
+void ChangeDistance(char cd, double cv, double * dist)
 {
 	//new value
 	double nv;
@@ -614,29 +637,30 @@ void ChangeDistance(char cd, double cv, double *mbd, double *mfd, double *mld, d
 	switch(cd)
 	{
 		case 'f':
-			(*mfd) = cv;
+			dist[1] = cv;
 			break;
 		case 'b':
-			(*mbd) = cv;
+			dist[0] = cv;
 			break;
 		case 'l':
-			(*mld) = cv;
+			dist[2] = cv;
 			break;
 		case 'r':
-			(*mrd) = cv;
+			dist[3] = cv;
 			break;
 		default:
 			cout << "STOP MESSING THINGS UP!" << endl;
 			break;
 	}
-
-	cout << cv << (*mfd) << (*mbd) << (*mld) << (*mrd) << endl;	
+	
+	//cout << cv << (*mfd) << (*mbd) << (*mld) << (*mrd) << endl;	
 }
 
 bool IsValueInDpos(double *value)
 {
 	for( dpit = dpos.begin(); dpit != dpos.end(); dpit++)
 	{
+		cout << (*dpit)[0] << " " << (*dpit)[1] << " " << value[0] << " " << value[1] << endl;
 		if( (*dpit)[0] == value[0] && (*dpit)[1] == value[1] )
 		{
 			return true;
