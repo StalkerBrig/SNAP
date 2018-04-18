@@ -19,307 +19,98 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
-/*
- * PRIVATE HEADER
- */
-
-#define DRONE_IP                    "192.168.42.1"
-#define DRONE_MAX_ALTITUDE          1.0
-#define DRONE_MAX_HORIZONTAL_SPEED  0.3
-#define DRONE_MAX_VERTICAL_SPEED    0.3
-#define LAND_AFTER_LAST_WAYPOINT    true
-#define CALIBRATION_FILE            "res/calib_bd2.xml"
-#define HULLPROTECTIONON            true
-#define LOOK_FOR_CHESSBOARD         false
-
-double INTERSECTION_THRESHOLD = 4.0;
-double WALL_THRESHOLD = 1.0;
-//arbitrary value... probably something better could be used
-double INTERSECTION_INDICATOR[2] = { 100000000000, -100000000000 };
+#include "SNAP_rudi.h"
 
 using namespace std;
 
-class DistAndDirec
-{
-public:
-	double distance;
-	char direction;	
-};
+const double DistAndDirec::INTERSECTION_THRESHOLD = 4.0;
+const double DistAndDirec::WALL_THRESHOLD = 1.0;
+//arbitrary value... probably something better could be used
+double DistAndDirec::INTERSECTION_INDICATOR[2] = { 100000000000, -100000000000 };
 
+//drone position (should only be one copy)
+vector <double*> DistAndDirec::dpos; 
+//which way the drone was moving (again, only ever one copy)
+vector <char> DistAndDirec::ddirec;
 
-/*
-	This lets us know where the drone is at
-*/
-//drone position
-vector <double*> dpos;
-//drone iterator
-vector <double*> :: iterator dpit;
-//drone reverse iterator
-vector <double*> :: reverse_iterator dprit;
-//which way the drone was moving
-vector <char> ddirec;
-vector <char> :: iterator ddit;
-vector <char> :: reverse_iterator ddrit;
-bool IsValueInDpos(double *value);
+void handleIntersection( DistAndDirec& intersection, char& current_direction, double* nia_position, double& mbd, double& mfd, double& mld, double& mrd ){
+	cout << "INTERSECTION!!!!!" << endl;
+			
+	bool prev_intersection = false;
 
-void ReadyToReadScan();
-double ** ReadScanFile(string fn);
-double * CheckMaxCoord(double x, double y, int check_x_or_y, double current_min[]);
-DistAndDirec FindMaxDistance(double mbd, double mfd, double mld, double mrd);
-DistAndDirec CheckForIntersections(double mbd, double mfd, double mld, double mrd, char cd);
-double GetDistance(double mbd, double mfd, double mld, double mrd, char cd);
-char ReverseDirection(char cd);
-//void ChangeDistance(char cd, double cv, double *mbd, double *mfd, double *mld, double *mrd);
-void ChangeDistance(char cd, double cv, double * dist);
-
-
-/* TODO: Need to uncomment drone code if trying to use drone;
-          currently just trying to make a droneless code   */
-//Drone bebop;
-
-/* Signal catches; if a process dies, we need drone to emergency stop */
-/*
-void kill_handler (int junk)
-{
-	signal(SIGINT, kill_handler);
-	cout << endl << "AHHHHHHHHHHHH, WHAT ARE YOU DOING" << endl;
-	bebop.emergency();
-	exit(1);
-}
-*/
-
-int main(int argc, char *argv[]) {
-	
-	cout << argc << endl;	
-	if( argc != 2 )
+	char prev_direction = current_direction; 
+			
+	current_direction = intersection.direction;
+			
+	//looking to see if we are at a new intersection!
+	if ( !IsValueInDpos(nia_position) )
 	{
-		//need to put the file name of where the scans will go;
-		// this assumes all scans will go to the same file
-		cout << "PUT IN A FILE NAME, FOOL!" << endl;
- 		exit(0);
+		cout << "????" << endl;
+		DistAndDirec::ddirec.push_back('x');
+		//If we reach an intersection, don't want to go down the way we came
+		// when we come back to it
+		DistAndDirec::ddirec.push_back(ReverseDirection(prev_direction));
 	}
-	
-
-		
-	/* SETUP FOR DONE */	
-/*	signal(SIGINT, kill_handler);
-	bebop.connect();
-
-	while(!bebop.isRunning()){ sleep(1); }
-
-	bebop.setMaxAltitude(DRONE_MAX_ALTITUDE);
-   bebop.setMaxHorizontalSpeed(DRONE_MAX_HORIZONTAL_SPEED);
-   bebop.setMaxVerticalSpeed(DRONE_MAX_VERTICAL_SPEED);
-
-	if(bebop.blockingFlatTrim()) 
+	else //we are at a previous intersection
 	{
-		std::cout << "FLAT TRIM IS OK" << std::endl;
+		prev_intersection = true;
 	}
-	else
+			
+			
+	//This means we need to go back through the other paths we did not take yet
+	if( prev_intersection == true )
 	{
-		std::cerr << "FLAT TRIM NOT OK" << std::endl;
-		return 1;
+		cout << "AHKKKKKKKK" << endl;
+		//making temp ints for intersection maxes
+		double imbd = mbd;
+		double imfd = mfd;
+		double imld = mld;
+		double imrd = mrd;
+		
+		double idist[4] = {imbd, imfd, imld, imrd};
+		
+		//the idea behind this is that we go through all the previous route we
+		// went to at this intersection and make their max 0 (temporarily)
+		// when we do this, we know which new direction to go
+		vector <char> :: reverse_iterator ddrit;
+		for (ddrit = DistAndDirec::ddirec.rbegin(); ddrit != DistAndDirec::ddirec.rend() && (*ddrit) != 'x'; ddrit++)
+		{
+			cout << (*ddrit) << endl;
+			ChangeDistance(*ddrit, 0, idist);
+		}
+				
+		imbd = idist[0];
+		imfd = idist[1];
+		imld = idist[2];
+		imrd = idist[3];
+			
+		/*
+			Checking l and f here, since it will basically check all directions at the
+			 intersection. left first since we are prioritizing: left, forward, right
+		*/	
+		current_direction = 'l';
+		intersection = CheckForIntersections(imbd, imfd, imld, imrd, current_direction);
+		if(intersection.direction == 'n')
+		{
+			current_direction = 'f';	
+			intersection = CheckForIntersections(imbd, imfd, imld, imrd, current_direction);
+		}
+
+		current_direction = intersection.direction;
+				
+		if (current_direction == 'n')
+		{
+			cout << "THE DRONE HAS NOWHERE ELSE TO GO! NAVIGATION COMPLETE!" << endl;
+			exit(0);
+		}			
+
 	}
-*/	/*END SETUP*/
-	
-	/*
-	   This is very rudimentary; the drone cannot currently fly with
-		everything on it.
-	*/
-	
-	string file_name = argv[1];
-	
-	bool getting_info_loop = true;
-	//node info array
-	double ** nia = NULL;
-	
-	//max backwards distance
-	double mbd;
-	//max forward distance
-	double mfd;
-	//max left distance
-	double mld;
-	//max right distance
-	double mrd; 
-	
-	//n meaning not determined
-	char current_direction = 'n';
-	char initial_direction = 'n';	
-	DistAndDirec drone_dd_vals;
-	DistAndDirec intersection;
-	double current_distance;
-	
-	bool currently_reversing = false;
-	bool did_reverse = false;	
-
-	while(getting_info_loop)
-	{	
-		ReadyToReadScan();
-		
-		//nia[0] = node coordinates
-		//nia[1] = max backward distance vector
-		//nia[2] = max forward distance vector
-		//nia[3] = max left distance vector
-		//nia[4] = max right distance vector
-		nia = ReadScanFile(file_name);
-		
-		//helps readability, hopefully..
-		
-		double *nia_position = nia[0];
-		mbd = nia[1][0];
-		mfd = nia[2][0];
-		mld = nia[3][1];
-		mrd = nia[4][1];
-		
-		if( initial_direction == 'n' )
-		{
-			drone_dd_vals = FindMaxDistance(mbd, mfd, mld, mrd);
-			initial_direction = drone_dd_vals.direction;
-			current_direction = initial_direction;
-			cout << "Go: " << initial_direction << endl;	
-			continue;
-		}
-		
-		intersection = CheckForIntersections(mbd, mfd, mld, mrd, current_direction);		
-		
-		// n indicates no value was set, thus it isn't an intersection
-		if( intersection.direction != 'n')
-		{	
-			cout << "INTERSECTION!!!!!" << endl;
 			
-			bool prev_intersection = false;
-
-			char prev_direction = current_direction; 
+	DistAndDirec::dpos.push_back(DistAndDirec::INTERSECTION_INDICATOR);
 			
-			current_direction = intersection.direction;
-			
-			//looking to see if we are at a new intersection!
-			if ( !IsValueInDpos(nia_position) )
-			{
-				cout << "????" << endl;
-				ddirec.push_back('x');
-				//If we reach an intersection, don't want to go down the way we came
-				// when we come back to it
-				ddirec.push_back(ReverseDirection(prev_direction));
-			}
-			else //we are at a previous intersection
-			{
-				prev_intersection = true;
-			}
-			
-			
-			//This means we need to go back through the other paths we did not take yet
-			if( prev_intersection == true )
-			{
-				cout << "AHKKKKKKKK" << endl;
-				//making temp ints for intersection maxes
-				double imbd = mbd;
-				double imfd = mfd;
-				double imld = mld;
-				double imrd = mrd;
-				
-				double idist[4] = {imbd, imfd, imld, imrd};
-				
-				//the idea behind this is that we go through all the previous route we
-				// went to at this intersection and make their max 0 (temporarily)
-				// when we do this, we know which new direction to go
-				for (ddrit = ddirec.rbegin(); ddrit != ddirec.rend() && (*ddrit) != 'x'; ddrit++)
-				{
-					cout << (*ddrit) << endl;
-					ChangeDistance(*ddrit, 0, idist);
-				}
-				
-				imbd = idist[0];
-				imfd = idist[1];
-				imld = idist[2];
-				imrd = idist[3];
-			
-				/*
-					Checking l and f here, since it will basically check all directions at the
-					 intersection. left first since we are prioritizing: left, forward, right
-				*/	
-				current_direction = 'l';
-				intersection = CheckForIntersections(imbd, imfd, imld, imrd, current_direction);
-				if(intersection.direction == 'n')
-				{
-					current_direction = 'f';	
-					intersection = CheckForIntersections(imbd, imfd, imld, imrd, current_direction);
-				}
-
-				current_direction = intersection.direction;
-				
-				if (current_direction == 'n')
-				{
-					cout << "THE DRONE HAS NOWHERE ELSE TO GO! NAVIGATION COMPLETE!" << endl;
-					exit(0);
-				}			
-
-			}
-			
-			dpos.push_back(INTERSECTION_INDICATOR);
-			
-			//don't want to go back down this way when we travel back to the
-			// intersection
-			ddirec.push_back(current_direction);
-		}
-		//need to insert the position after checking the intersection, since
-		// the intersection check looks for it inside. Not a huge deal,
-		// but will be easier since we don't need it til now anyways...
-		// That was a lot of comments for no real good reason.
-		dpos.push_back(nia_position);
-		
-		current_distance = GetDistance(mbd, mfd, mld, mrd, current_direction);
-
-		if( current_distance <= WALL_THRESHOLD )
-		{
-			cout << "WALLLLLLL!" << endl;
-			current_direction = ReverseDirection(current_direction);
-			currently_reversing = true;
-			dpos.pop_back();
-			//want to remove last position, since we need to reverse back
-			//dpos.pop_back();
-		}
-		
-		if( currently_reversing == true )
-		{
-			cout << "Begin reversing" << endl;
-			for (dprit = dpos.rbegin(); *dprit != INTERSECTION_INDICATOR; ++dprit)
-			{
-				ReadyToReadScan();
-				cout << "Go: " << current_direction << endl;
-				//dpos.pop_back();
-			}
-			
-			cout << "End reversing" << endl;	
-			currently_reversing = false;
-			did_reverse = true;
-		}
-	
-		/*	
-		for(dpit = dpos.begin(); dpit != dpos.end(); dpit++)
-		{	
-			cout << *dpit[0] << endl;
-		}	
-
-		for( ddit = ddirec.begin(); ddit != ddirec.end(); ddit++)
-		{
-			cout << *ddit << endl;
-		}
-		*/
-	
-		//just don't want to print out what direction to go twice	
-		if(did_reverse != true)
-		{
-			cout << "Go: " << current_direction << endl;	
-		}
-		else //we did just reverse
-		{
-			did_reverse = false;
-		}
-	
-	}
-
-	exit(0);
+	//don't want to go back down this way when we travel back to the
+	// intersection
+	DistAndDirec::ddirec.push_back(current_direction);
 }
 
 /*
@@ -545,7 +336,7 @@ DistAndDirec CheckForIntersections(double mbd, double mfd, double mld, double mr
 	{
 		//0, 0 is because we only want to look for mld and mrd
 		drone_dd_vals = FindMaxDistance(0, 0, mld, mrd);
-		if (drone_dd_vals.distance >= INTERSECTION_THRESHOLD)
+		if (drone_dd_vals.distance >= DistAndDirec::INTERSECTION_THRESHOLD)
 		{
 			intersection_vals.distance = drone_dd_vals.distance;
 			intersection_vals.direction = drone_dd_vals.direction;
@@ -556,7 +347,7 @@ DistAndDirec CheckForIntersections(double mbd, double mfd, double mld, double mr
 	{
 		//0, 0 is because we only want to look for mld and mrd
 		drone_dd_vals = FindMaxDistance(mbd, mfd, 0, 0);
-		if (drone_dd_vals.distance >= INTERSECTION_THRESHOLD)
+		if (drone_dd_vals.distance >= DistAndDirec::INTERSECTION_THRESHOLD)
 		{
 			intersection_vals.distance = drone_dd_vals.distance;
 			intersection_vals.direction = drone_dd_vals.direction;
@@ -658,7 +449,8 @@ void ChangeDistance(char cd, double cv, double * dist)
 
 bool IsValueInDpos(double *value)
 {
-	for( dpit = dpos.begin(); dpit != dpos.end(); dpit++)
+	vector <double*> :: iterator dpit;
+	for( dpit = DistAndDirec::dpos.begin(); dpit != DistAndDirec::dpos.end(); dpit++)
 	{
 		cout << (*dpit)[0] << " " << (*dpit)[1] << " " << value[0] << " " << value[1] << endl;
 		if( (*dpit)[0] == value[0] && (*dpit)[1] == value[1] )

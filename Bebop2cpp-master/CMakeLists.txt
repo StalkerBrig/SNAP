@@ -74,7 +74,7 @@ install(TARGETS bebop2cpp LIBRARY DESTINATION lib)
 install(FILES ${INCLUDE_FILES} DESTINATION include/bebop2cpp/)
 
 
-add_executable(SNAP_rudi SNAP/SNAP_rudi.cpp)
+add_executable(SNAP_rudi SNAP/SNAP_rudi.cpp SNAP/main_rudi.cpp)
 target_link_libraries(SNAP_rudi bebop2cpp)
 
 
