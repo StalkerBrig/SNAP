@@ -19,139 +19,27 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
-/*
- * PRIVATE HEADER
- */
-
-#define DRONE_IP                    "192.168.42.1"
-#define DRONE_MAX_ALTITUDE          1.0
-#define DRONE_MAX_HORIZONTAL_SPEED  0.3
-#define DRONE_MAX_VERTICAL_SPEED    0.3
-#define LAND_AFTER_LAST_WAYPOINT    true
-#define CALIBRATION_FILE            "res/calib_bd2.xml"
-#define HULLPROTECTIONON            true
-#define LOOK_FOR_CHESSBOARD         false
-
-double INTERSECTION_THRESHOLD = 4.0;
-double WALL_THRESHOLD = 1.0;
-//arbitrary value... probably something better could be used
-double INTERSECTION_INDICATOR[2] = { 100000000000, -100000000000 };
+#include "navi.h"
 
 using namespace std;
 
-class DistAndDirec
-{
-public:
-	double distance;
-	char direction;	
-};
+const double Navi::INTERSECTION_THRESHOLD = 4.0;
+const double Navi::WALL_THRESHOLD = 1.0;
+//arbitrary value... probably something better could be used
+double Navi::INTERSECTION_INDICATOR[2] = { 100000000000, -100000000000 };
 
-
-/*
-	This lets us know where the drone is at
-*/
-//drone position
-vector <double*> dpos;
-//drone iterator
-vector <double*> :: iterator dpit;
-//drone reverse iterator
-vector <double*> :: reverse_iterator dprit;
-//which way the drone was moving
-vector <char> ddirec;
-vector <char> :: iterator ddit;
-vector <char> :: reverse_iterator ddrit;
-bool IsValueInDpos(double *value);
-
-void ReadyToReadScan();
-double ** ReadScanFile(string fn);
-double * CheckMaxCoord(double x, double y, int check_x_or_y, double current_min[]);
-DistAndDirec FindMaxDistance(double mbd, double mfd, double mld, double mrd);
-DistAndDirec CheckForIntersections(double mbd, double mfd, double mld, double mrd, char cd);
-double GetDistance(double mbd, double mfd, double mld, double mrd, char cd);
-char ReverseDirection(char cd);
-//void ChangeDistance(char cd, double cv, double *mbd, double *mfd, double *mld, double *mrd);
-void ChangeDistance(char cd, double cv, double * dist);
-
-
-/* TODO: Need to uncomment drone code if trying to use drone;
-          currently just trying to make a droneless code   */
-//Drone bebop;
-
-/* Signal catches; if a process dies, we need drone to emergency stop */
-/*
-void kill_handler (int junk)
-{
-	signal(SIGINT, kill_handler);
-	cout << endl << "AHHHHHHHHHHHH, WHAT ARE YOU DOING" << endl;
-	bebop.emergency();
-	exit(1);
-}
-*/
-
-int main(int argc, char *argv[]) {
-	
-	cout << argc << endl;	
-	if( argc != 2 )
-	{
-		//need to put the file name of where the scans will go;
-		// this assumes all scans will go to the same file
-		cout << "PUT IN A FILE NAME, FOOL!" << endl;
- 		exit(0);
-	}
-	
-
-		
-	/* SETUP FOR DONE */	
-/*	signal(SIGINT, kill_handler);
-	bebop.connect();
-
-	while(!bebop.isRunning()){ sleep(1); }
-
-	bebop.setMaxAltitude(DRONE_MAX_ALTITUDE);
-   bebop.setMaxHorizontalSpeed(DRONE_MAX_HORIZONTAL_SPEED);
-   bebop.setMaxVerticalSpeed(DRONE_MAX_VERTICAL_SPEED);
-
-	if(bebop.blockingFlatTrim()) 
-	{
-		std::cout << "FLAT TRIM IS OK" << std::endl;
-	}
-	else
-	{
-		std::cerr << "FLAT TRIM NOT OK" << std::endl;
-		return 1;
-	}
-*/	/*END SETUP*/
-	
-	/*
-	   This is very rudimentary; the drone cannot currently fly with
-		everything on it.
-	*/
-	
-	string file_name = argv[1];
-	
-	bool getting_info_loop = true;
+Navi::Navi(){
+	getting_info_loop = true;
 	//node info array
-	double ** nia = NULL;
+	nia = NULL;
+	current_direction = 'n';
+	initial_direction = 'n';
 	
-	//max backwards distance
-	double mbd;
-	//max forward distance
-	double mfd;
-	//max left distance
-	double mld;
-	//max right distance
-	double mrd; 
-	
-	//n meaning not determined
-	char current_direction = 'n';
-	char initial_direction = 'n';	
-	DistAndDirec drone_dd_vals;
-	DistAndDirec intersection;
-	double current_distance;
-	
-	bool currently_reversing = false;
-	bool did_reverse = false;	
+	currently_reversing = false;
+	did_reverse = false;
+}
 
+void Navi::mainLoop( string file_name ){
 	while(getting_info_loop)
 	{	
 		ReadyToReadScan();
@@ -165,7 +53,7 @@ int main(int argc, char *argv[]) {
 		
 		//helps readability, hopefully..
 		
-		double *nia_position = nia[0];
+		nia_position = nia[0];
 		mbd = nia[1][0];
 		mfd = nia[2][0];
 		mld = nia[3][1];
@@ -185,82 +73,7 @@ int main(int argc, char *argv[]) {
 		// n indicates no value was set, thus it isn't an intersection
 		if( intersection.direction != 'n')
 		{	
-			cout << "INTERSECTION!!!!!" << endl;
-			
-			bool prev_intersection = false;
-
-			char prev_direction = current_direction; 
-			
-			current_direction = intersection.direction;
-			
-			//looking to see if we are at a new intersection!
-			if ( !IsValueInDpos(nia_position) )
-			{
-				cout << "????" << endl;
-				ddirec.push_back('x');
-				//If we reach an intersection, don't want to go down the way we came
-				// when we come back to it
-				ddirec.push_back(ReverseDirection(prev_direction));
-			}
-			else //we are at a previous intersection
-			{
-				prev_intersection = true;
-			}
-			
-			
-			//This means we need to go back through the other paths we did not take yet
-			if( prev_intersection == true )
-			{
-				cout << "AHKKKKKKKK" << endl;
-				//making temp ints for intersection maxes
-				double imbd = mbd;
-				double imfd = mfd;
-				double imld = mld;
-				double imrd = mrd;
-				
-				double idist[4] = {imbd, imfd, imld, imrd};
-				
-				//the idea behind this is that we go through all the previous route we
-				// went to at this intersection and make their max 0 (temporarily)
-				// when we do this, we know which new direction to go
-				for (ddrit = ddirec.rbegin(); ddrit != ddirec.rend() && (*ddrit) != 'x'; ddrit++)
-				{
-					cout << (*ddrit) << endl;
-					ChangeDistance(*ddrit, 0, idist);
-				}
-				
-				imbd = idist[0];
-				imfd = idist[1];
-				imld = idist[2];
-				imrd = idist[3];
-			
-				/*
-					Checking l and f here, since it will basically check all directions at the
-					 intersection. left first since we are prioritizing: left, forward, right
-				*/	
-				current_direction = 'l';
-				intersection = CheckForIntersections(imbd, imfd, imld, imrd, current_direction);
-				if(intersection.direction == 'n')
-				{
-					current_direction = 'f';	
-					intersection = CheckForIntersections(imbd, imfd, imld, imrd, current_direction);
-				}
-
-				current_direction = intersection.direction;
-				
-				if (current_direction == 'n')
-				{
-					cout << "THE DRONE HAS NOWHERE ELSE TO GO! NAVIGATION COMPLETE!" << endl;
-					exit(0);
-				}			
-
-			}
-			
-			dpos.push_back(INTERSECTION_INDICATOR);
-			
-			//don't want to go back down this way when we travel back to the
-			// intersection
-			ddirec.push_back(current_direction);
+			handleIntersection();
 		}
 		//need to insert the position after checking the intersection, since
 		// the intersection check looks for it inside. Not a huge deal,
@@ -268,9 +81,9 @@ int main(int argc, char *argv[]) {
 		// That was a lot of comments for no real good reason.
 		dpos.push_back(nia_position);
 		
-		current_distance = GetDistance(mbd, mfd, mld, mrd, current_direction);
+		current_distance = GetDistance(current_direction);
 
-		if( current_distance <= WALL_THRESHOLD )
+		if( current_distance <= Navi::WALL_THRESHOLD )
 		{
 			cout << "WALLLLLLL!" << endl;
 			current_direction = ReverseDirection(current_direction);
@@ -283,7 +96,8 @@ int main(int argc, char *argv[]) {
 		if( currently_reversing == true )
 		{
 			cout << "Begin reversing" << endl;
-			for (dprit = dpos.rbegin(); *dprit != INTERSECTION_INDICATOR; ++dprit)
+			vector <double*> :: reverse_iterator dprit;
+			for (dprit = dpos.rbegin(); *dprit != Navi::INTERSECTION_INDICATOR; ++dprit)
 			{
 				ReadyToReadScan();
 				cout << "Go: " << current_direction << endl;
@@ -295,12 +109,15 @@ int main(int argc, char *argv[]) {
 			did_reverse = true;
 		}
 	
-		/*	
+		/*
+		vector <double*> :: iterator dpit;	
 		for(dpit = dpos.begin(); dpit != dpos.end(); dpit++)
 		{	
 			cout << *dpit[0] << endl;
 		}	
 
+
+		vector <char> :: iterator ddit;
 		for( ddit = ddirec.begin(); ddit != ddirec.end(); ddit++)
 		{
 			cout << *ddit << endl;
@@ -319,13 +136,93 @@ int main(int argc, char *argv[]) {
 	
 	}
 
-	exit(0);
+
+}
+
+void Navi::handleIntersection(){
+	cout << "INTERSECTION!!!!!" << endl;
+			
+	bool prev_intersection = false;
+
+	char prev_direction = current_direction; 
+			
+	current_direction = intersection.direction;
+			
+	//looking to see if we are at a new intersection!
+	if ( !IsValueInDpos(nia_position) )
+	{
+		cout << "????" << endl;
+		ddirec.push_back('x');
+		//If we reach an intersection, don't want to go down the way we came
+		// when we come back to it
+		ddirec.push_back(ReverseDirection(prev_direction));
+	}
+	else //we are at a previous intersection
+	{
+		prev_intersection = true;
+	}
+			
+			
+	//This means we need to go back through the other paths we did not take yet
+	if( prev_intersection == true )
+	{
+		cout << "AHKKKKKKKK" << endl;
+		//making temp ints for intersection maxes
+		double imbd = mbd;
+		double imfd = mfd;
+		double imld = mld;
+		double imrd = mrd;
+		
+		double idist[4] = {imbd, imfd, imld, imrd};
+		
+		//the idea behind this is that we go through all the previous route we
+		// went to at this intersection and make their max 0 (temporarily)
+		// when we do this, we know which new direction to go
+		vector <char> :: reverse_iterator ddrit;
+		for (ddrit = ddirec.rbegin(); ddrit != ddirec.rend() && (*ddrit) != 'x'; ddrit++)
+		{
+			cout << (*ddrit) << endl;
+			ChangeDistance(*ddrit, 0, idist);
+		}
+				
+		imbd = idist[0];
+		imfd = idist[1];
+		imld = idist[2];
+		imrd = idist[3];
+			
+		/*
+			Checking l and f here, since it will basically check all directions at the
+			 intersection. left first since we are prioritizing: left, forward, right
+		*/	
+		current_direction = 'l';
+		intersection = CheckForIntersections(imbd, imfd, imld, imrd, current_direction);
+		if(intersection.direction == 'n')
+		{
+			current_direction = 'f';	
+			intersection = CheckForIntersections(imbd, imfd, imld, imrd, current_direction);
+		}
+
+		current_direction = intersection.direction;
+				
+		if (current_direction == 'n')
+		{
+			cout << "THE DRONE HAS NOWHERE ELSE TO GO! NAVIGATION COMPLETE!" << endl;
+			exit(0);
+		}			
+
+	}
+			
+	dpos.push_back(Navi::INTERSECTION_INDICATOR);
+			
+	//don't want to go back down this way when we travel back to the
+	// intersection
+	ddirec.push_back(current_direction);
 }
 
 /*
 	This just makes sure the user is ready
 */
-void ReadyToReadScan()
+void Navi::ReadyToReadScan()
 {
 	char scan_ready;
 	cout << "Ready for next scan (y for yes; e for exit)" << endl;
@@ -349,7 +246,7 @@ void ReadyToReadScan()
 	}
 }
 
-double **  ReadScanFile(string fn)
+double ** Navi::ReadScanFile(string fn)
 {
 	ifstream fin;
 	double x_info;
@@ -437,7 +334,7 @@ double **  ReadScanFile(string fn)
 	check_x_or_y means which index it should be checking in the array:
 		0 for x, 1 for y
 */
-double * CheckMaxCoord(double x, double y, int check_x_or_y, double current_min[])
+double * Navi::CheckMaxCoord(double x, double y, int check_x_or_y, double current_min[])
 {
 	double * new_min_array = new double[2];
 	
@@ -477,15 +374,13 @@ double * CheckMaxCoord(double x, double y, int check_x_or_y, double current_min[
 	return new_min_array;
 }
 
-DistAndDirec FindMaxDistance(double mbd, double mfd, double mld, double mrd)
+DistAndDirec Navi::FindMaxDistance(double bd, double fd, double ld, double rd)
 {	
-	DistAndDirec drone_dd_vals;
-	
 	/*
 		I am putting mfd first because this would be the direction to move
 		if there is a tie between the distances.
 	*/
-	double distance_array[4] = {mfd, mbd, mld, mrd};
+	double distance_array[4] = {fd, bd, ld, rd};
 
 	double cur_max = 0;
 	int best_index = -1;
@@ -530,43 +425,39 @@ DistAndDirec FindMaxDistance(double mbd, double mfd, double mld, double mrd)
 /*
 	cd = current direction
 */
-DistAndDirec CheckForIntersections(double mbd, double mfd, double mld, double mrd, char cd)
+DistAndDirec Navi::CheckForIntersections(double bd, double fd, double ld, double rd, char cd)
 {
-	DistAndDirec drone_dd_vals;	
-	DistAndDirec intersection_vals;	
-	
-
-	intersection_vals.distance = 0;
-	intersection_vals.direction = 'n';
+	intersection.distance = 0;
+	intersection.direction = 'n';
 	
 	//We check for f and b here, because we don't want to go in the opposite direction
 	// and loop between the two largest values.
 	if( cd == 'f' || cd == 'b' )
 	{
 		//0, 0 is because we only want to look for mld and mrd
-		drone_dd_vals = FindMaxDistance(0, 0, mld, mrd);
-		if (drone_dd_vals.distance >= INTERSECTION_THRESHOLD)
+		drone_dd_vals = FindMaxDistance(0, 0, ld, rd);
+		if (drone_dd_vals.distance >= Navi::INTERSECTION_THRESHOLD)
 		{
-			intersection_vals.distance = drone_dd_vals.distance;
-			intersection_vals.direction = drone_dd_vals.direction;
+			intersection.distance = drone_dd_vals.distance;
+			intersection.direction = drone_dd_vals.direction;
 		}
 	}
 
 	if( cd == 'l' || cd == 'r' )
 	{
 		//0, 0 is because we only want to look for mld and mrd
-		drone_dd_vals = FindMaxDistance(mbd, mfd, 0, 0);
-		if (drone_dd_vals.distance >= INTERSECTION_THRESHOLD)
+		drone_dd_vals = FindMaxDistance(bd, fd, 0, 0);
+		if (drone_dd_vals.distance >= Navi::INTERSECTION_THRESHOLD)
 		{
-			intersection_vals.distance = drone_dd_vals.distance;
-			intersection_vals.direction = drone_dd_vals.direction;
+			intersection.distance = drone_dd_vals.distance;
+			intersection.direction = drone_dd_vals.direction;
 		}
 	}
 
-	return intersection_vals;
+	return intersection;
 }
 
-double GetDistance(double mbd, double mfd, double mld, double mrd, char cd)
+double Navi::GetDistance(char cd)
 {
 	double current_distance;
 
@@ -596,7 +487,7 @@ double GetDistance(double mbd, double mfd, double mld, double mrd, char cd)
 /*
 	cd = current_direction
 */
-char ReverseDirection(char cd)
+char Navi::ReverseDirection(char cd)
 {
 	//new direction
 	char nd;
@@ -629,7 +520,7 @@ char ReverseDirection(char cd)
 	cv = changed value
 */
 //void ChangeDistance(char cd, double cv, double *mbd, double *mfd, double *mld, double *mrd)
-void ChangeDistance(char cd, double cv, double * dist)
+void Navi::ChangeDistance(char cd, double cv, double * dist)
 {
 	//new value
 	double nv;
@@ -656,8 +547,9 @@ void ChangeDistance(char cd, double cv, double * dist)
 	//cout << cv << (*mfd) << (*mbd) << (*mld) << (*mrd) << endl;	
 }
 
-bool IsValueInDpos(double *value)
+bool Navi::IsValueInDpos(double *value)
 {
+	vector <double*> :: iterator dpit;
 	for( dpit = dpos.begin(); dpit != dpos.end(); dpit++)
 	{
 		cout << (*dpit)[0] << " " << (*dpit)[1] << " " << value[0] << " " << value[1] << endl;

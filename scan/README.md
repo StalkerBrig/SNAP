@@ -16,8 +16,8 @@ This is what the -lsweep link in the compilation is for
 The scanning code was adapted from the examples listed in the above instructions
 
 
-Currently compiled with:
+Currently compiled (to object file) with:
 
-    g++ -o scan scan.cpp -lsweep
+    g++ -std=c++11 -c scan.cpp -lsweep
 
 See Config folder for configuration instructions
