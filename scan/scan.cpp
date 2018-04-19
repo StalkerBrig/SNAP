@@ -105,7 +105,7 @@ void Scan::coord_polar_to_rect( const double& radius, const double& angle_degree
 	y = radius * sin( DegreestoRadians( angle_degrees ) );
 }
 
-int Scan::perform_scan(std::ofstream& of){
+int Scan::perform_scan(std::ofstream& of, std::ofstream& nof){
 
     double angle;
     double y;
@@ -135,10 +135,12 @@ int Scan::perform_scan(std::ofstream& of){
 				
 				coord_polar_to_rect(sample.distance, angle, x, y);
 				
-                if ((x/100.0 < 6.0 && x/100.0 > -6.0) && 
+                if ((x/100.0 < 6666.0 && x/100.0 > -6.0) && 
 					(y/100.0 < 6.0 && y/100.0 > -6.0)){
 					of << x/100.0;
 					of << " " << y/100.0 << " 0" << std::endl; 
+					nof << x/100.0;
+					nof << " " << y/100.0 << " 0" << std::endl; 
                 }
             }
         }
