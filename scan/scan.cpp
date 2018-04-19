@@ -131,17 +131,23 @@ int Scan::perform_scan(std::ofstream& of, std::ofstream& nof){
 
             for (const sweep::sample& sample : scan.samples){
 //                std::cout << "angle " << (double)sample.angle/1000 << " distance " << sample.distance << " strength " << sample.signal_strength << std::endl;
-				angle = (double)sample.angle/1000;
+				if( sample.distance != 1 ){
+					//if the scanner detecs an error, the distance comes back as 1cm
+					angle = (double)sample.angle/1000;
+					coord_polar_to_rect(sample.distance, angle, x, y);
 				
-				coord_polar_to_rect(sample.distance, angle, x, y);
-				
-                if ((x/100.0 < 6666.0 && x/100.0 > -6.0) && 
-					(y/100.0 < 6.0 && y/100.0 > -6.0)){
-					of << x/100.0;
-					of << " " << y/100.0 << " 0" << std::endl; 
-					nof << x/100.0;
-					nof << " " << y/100.0 << " 0" << std::endl; 
-                }
+					if ( sample.distance/100.0 <= 4.0 && sample.distance/100.0 >= (-4.0) ){
+						//only keep data that is within a cirlce w/ radius 4.0m
+
+						//data for octomaps
+						of << x/100.0;
+						of << " " << y/100.0 << " 0" << std::endl; 
+						
+						//data for the navi (in M)
+						nof << angle;
+						nof << " " << sample.distance/100.0 << " 0" << std::endl; 
+					}
+				}
             }
         }
 
