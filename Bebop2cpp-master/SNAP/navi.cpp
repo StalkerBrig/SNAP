@@ -412,20 +412,23 @@ double * Navi::CheckMaxCoord(double angle, double dist, char check_axis, double 
 		new_min_array[1] = dist;
 		return new_min_array;
 	}
-	
+    	
     double check_angle = current_min[0];
 	double check_dist = current_min[1];
     
     double angle_calc = 100000;
+    double calc_check_angle = 100000;
 
 	new_min_array[0] = current_min[0];
 	new_min_array[1] = current_min[1];
+
 
     switch(check_axis)
     {
         case 'b':
             angle_calc = abs(angle - 180);
-            if (angle_calc < check_angle)
+            calc_check_angle = abs(check_angle - 180);
+            if (angle_calc < calc_check_angle)
             {
                 new_min_array[0] = angle;
                 new_min_array[1] = dist;
@@ -433,10 +436,18 @@ double * Navi::CheckMaxCoord(double angle, double dist, char check_axis, double 
             break;
         
         case 'f':
-            if (angle >= 270) //check for numbers closer to 360
+            if (angle >= 180) //check for numbers closer to 360
             {
+                if( check_angle >= 180 ) //closer to 360
+                {
+                    calc_check_angle = abs(check_angle - 360);
+                }
+                else //is closer to 0
+                {
+                    calc_check_angle = abs(check_angle - 0);
+                }
                 angle_calc = abs(angle - 360);
-                if (angle_calc < check_angle)
+                if (angle_calc < calc_check_angle)
                 {
                     new_min_array[0] = angle;
                     new_min_array[1] = dist;
@@ -444,8 +455,16 @@ double * Navi::CheckMaxCoord(double angle, double dist, char check_axis, double 
             }
             else //check for numbers closer to 0
             {
+                if( check_angle >= 180 ) //closer to 360
+                {
+                    calc_check_angle = abs(check_angle - 360);
+                }
+                else //is closer to 0
+                {
+                    calc_check_angle = abs(check_angle - 0);
+                }
                 angle_calc = abs(angle - 0);
-                if (angle_calc < check_angle)
+                if (angle_calc < calc_check_angle)
                 {
                     new_min_array[0] = angle;
                     new_min_array[1] = dist;
@@ -456,7 +475,8 @@ double * Navi::CheckMaxCoord(double angle, double dist, char check_axis, double 
         
         case 'l':
             angle_calc = abs(angle - 90);
-            if (angle_calc < check_angle)
+            calc_check_angle = abs(check_angle - 90);
+            if (angle_calc < calc_check_angle)
             {
                 new_min_array[0] = angle;
                 new_min_array[1] = dist;
@@ -466,7 +486,8 @@ double * Navi::CheckMaxCoord(double angle, double dist, char check_axis, double 
         
         case 'r':
             angle_calc = abs(angle - 270);
-            if (angle_calc < check_angle)
+            calc_check_angle = abs(check_angle - 270);
+            if (angle_calc < calc_check_angle)
             {
                 new_min_array[0] = angle;
                 new_min_array[1] = dist;
