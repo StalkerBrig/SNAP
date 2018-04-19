@@ -39,8 +39,8 @@ private:
 	bool IsValueInDpos(double *value);
 	void ReadyToReadScan();
 	double ** ReadScanFile(string fn);
-	double * CheckMaxCoord(double x, double y, int check_x_or_y, double current_min[]);
-	double GetDistance(char cd);
+    double * CheckMaxCoord(double angle, double dist, char check_axis, double current_min[]);
+    double GetDistance(char cd);
 	char ReverseDirection(char cd);
 	//void ChangeDistance(char cd, double cv, double *mbd, double *mfd, double *mld, double *mrd);
 	void ChangeDistance(char cd, double cv, double * dist);

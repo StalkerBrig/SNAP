@@ -24,7 +24,7 @@
 using namespace std;
 
 const double Navi::INTERSECTION_THRESHOLD = 4.0;
-const double Navi::WALL_THRESHOLD = 1.0;
+const double Navi::WALL_THRESHOLD = .6;
 //arbitrary value... probably something better could be used
 double Navi::INTERSECTION_INDICATOR[2] = { 100000000000, -100000000000 };
 
@@ -54,8 +54,8 @@ void Navi::mainLoop( string file_name ){
 		//helps readability, hopefully..
 		
 		nia_position = nia[0];
-		mbd = nia[1][0];
-		mfd = nia[2][0];
+		mbd = nia[1][1];
+		mfd = nia[2][1];
 		mld = nia[3][1];
 		mrd = nia[4][1];
 		
@@ -246,6 +246,7 @@ void Navi::ReadyToReadScan()
 	}
 }
 
+/*
 double ** Navi::ReadScanFile(string fn)
 {
 	ifstream fin;
@@ -272,7 +273,7 @@ double ** Navi::ReadScanFile(string fn)
 	getline(fin, info_line);
 	
 	istringstream iss(info_line);
-	
+    //junk is the NODE	
 	iss >> junk;
 	iss >> x_node_info;
 	iss >> y_node_info;
@@ -310,12 +311,10 @@ double ** Navi::ReadScanFile(string fn)
 		}
 	} 
 
-	/*
 	cout << "MBX: " << max_backward_x[0] << " " << max_backward_x[1] << endl;
 	cout << "MFX: " << max_forward_x[0] << " " << max_forward_x[1] << endl;
 	cout << "MLY: " << max_left_y[0] << " " << max_left_y[1] << endl;
 	cout << "MRY: " << max_right_y[0] << " " << max_right_y[1] << endl;
-	*/
 	fin.close();
 
 	double ** max_arrays = new double*[5];
@@ -329,47 +328,159 @@ double ** Navi::ReadScanFile(string fn)
 	return max_arrays;	
 	
 }
+*/
+
+
+double ** Navi::ReadScanFile(string fn)
+{
+	ifstream fin;
+	double scan_angle;
+	double scan_dist;
+	
+	double *node_info = new double[2];
+	double *max_forward_x = NULL;
+	double *max_backward_x = NULL;
+	double *max_left_y = NULL;
+	double *max_right_y = NULL;
+
+	string info_line;
+
+	string junk;
+	double x_node_info;
+	double y_node_info;
+
+	fin.open(fn);
+	
+	
+	//the first line is the "NODE" line, which should be discarded here	
+	getline(fin, info_line);
+	
+	istringstream iss(info_line);
+    //junk is the NODE	
+	iss >> junk;
+	iss >> x_node_info;
+	iss >> y_node_info;
+	node_info[0] = x_node_info;
+	node_info[1] = y_node_info;
+
+	//getting each x and y pair of data
+	while( getline(fin, info_line) )
+	{
+		//cout << info_line << endl;
+		
+		istringstream iss(info_line);
+
+		iss >> scan_angle;
+		iss >> scan_dist;
+	
+		max_backward_x = CheckMaxCoord(scan_angle, scan_dist, 'b', max_backward_x);
+		max_forward_x = CheckMaxCoord(scan_angle, scan_dist, 'f', max_forward_x);
+		max_left_y = CheckMaxCoord(scan_angle, scan_dist, 'l', max_left_y);
+		max_right_y = CheckMaxCoord(scan_angle, scan_dist, 'r', max_right_y);
+	} 
+	cout << "MBX: " << max_backward_x[0] << " " << max_backward_x[1] << endl;
+	cout << "MFX: " << max_forward_x[0] << " " << max_forward_x[1] << endl;
+	cout << "MLY: " << max_left_y[0] << " " << max_left_y[1] << endl;
+	cout << "MRY: " << max_right_y[0] << " " << max_right_y[1] << endl;
+	fin.close();
+
+	double ** max_arrays = new double*[5];
+	
+	max_arrays[0] = node_info;
+	max_arrays[1] = max_backward_x;
+	max_arrays[2] = max_forward_x;
+	max_arrays[3] = max_left_y;
+	max_arrays[4] = max_right_y;
+
+	return max_arrays;	
+}
+
+
 
 /*
 	check_x_or_y means which index it should be checking in the array:
 		0 for x, 1 for y
 */
-double * Navi::CheckMaxCoord(double x, double y, int check_x_or_y, double current_min[])
+double * Navi::CheckMaxCoord(double angle, double dist, char check_axis, double current_min[])
 {
 	double * new_min_array = new double[2];
 	
 	//if it is the first loop, need to set the min to current point
 	if( current_min == NULL )
 	{
-		new_min_array[0] = x;
-		new_min_array[1] = y;
+		new_min_array[0] = angle;
+		new_min_array[1] = dist;
 		return new_min_array;
 	}
 	
-	double check_min = current_min[check_x_or_y];
+    double check_angle = current_min[0];
+	double check_dist = current_min[1];
+    
+    double angle_calc = 100000;
 
 	new_min_array[0] = current_min[0];
 	new_min_array[1] = current_min[1];
 
-	//checking y
-	if( check_x_or_y == 0 ) 
-	{
-		if( abs(check_min) > abs(x) )
-		{
-			new_min_array[0] = x;
-			new_min_array[1] = y;
-		}
-	}
-	//checking x
-	if( check_x_or_y == 1 ) 
-	{
-		if( abs(check_min) > abs(y) )
-		{
-			new_min_array[0] = x;
-			new_min_array[1] = y;
-		}
-	}
-	delete[] current_min;
+    switch(check_axis)
+    {
+        case 'b':
+            angle_calc = abs(angle - 180);
+            if (angle_calc < check_angle)
+            {
+                new_min_array[0] = angle;
+                new_min_array[1] = dist;
+            }
+            break;
+        
+        case 'f':
+            if (angle >= 270) //check for numbers closer to 360
+            {
+                angle_calc = abs(angle - 360);
+                if (angle_calc < check_angle)
+                {
+                    new_min_array[0] = angle;
+                    new_min_array[1] = dist;
+                }
+            }
+            else //check for numbers closer to 0
+            {
+                angle_calc = abs(angle - 0);
+                if (angle_calc < check_angle)
+                {
+                    new_min_array[0] = angle;
+                    new_min_array[1] = dist;
+                }
+            }
+            
+            break;
+        
+        case 'l':
+            angle_calc = abs(angle - 90);
+            if (angle_calc < check_angle)
+            {
+                new_min_array[0] = angle;
+                new_min_array[1] = dist;
+            }
+            
+            break;
+        
+        case 'r':
+            angle_calc = abs(angle - 270);
+            if (angle_calc < check_angle)
+            {
+                new_min_array[0] = angle;
+                new_min_array[1] = dist;
+            }
+            
+            break;
+        
+        default:
+            cout << "How did you do this" << endl;
+            break;
+
+    }	
+
+    delete[] current_min;
 	
 	return new_min_array;
 }
