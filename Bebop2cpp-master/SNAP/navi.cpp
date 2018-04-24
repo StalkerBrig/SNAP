@@ -151,7 +151,6 @@ void Navi::handleIntersection(){
 	//looking to see if we are at a new intersection!
 	if ( !IsValueInDpos(nia_position) )
 	{
-		cout << "????" << endl;
 		ddirec.push_back('x');
 		//If we reach an intersection, don't want to go down the way we came
 		// when we come back to it
@@ -166,7 +165,6 @@ void Navi::handleIntersection(){
 	//This means we need to go back through the other paths we did not take yet
 	if( prev_intersection == true )
 	{
-		cout << "AHKKKKKKKK" << endl;
 		//making temp ints for intersection maxes
 		double imbd = mbd;
 		double imfd = mfd;

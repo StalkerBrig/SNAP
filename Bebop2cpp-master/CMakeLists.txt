@@ -9,7 +9,7 @@ include_directories(res)
 
 #create libbebop2cpp
 find_package(OpenCV REQUIRED)
-find_package(Boost COMPONENTS iostreams chrono date_time timer system filesystem log thread REQUIRED)
+find_package(Boost COMPONENTS chrono date_time timer system filesystem log thread REQUIRED)
 find_package(Eigen3 REQUIRED)
 
 # Needed for the Gnuplots examples
