@@ -1,15 +1,20 @@
+#pragma once
+
 #include <string>
 #include <vector>
 #include <cstdlib>
 #include <cstdio>
 #include <sweep/sweep.hpp>
+#include <fstream>
 
 class Scan{
     
     public:
         Scan();
-        int perform_scan();
+        int perform_scan(std::ofstream& outfile, std::ofstream& navfile);
         void set_device_path(std::string input_path);
+        double DegreestoRadians(const double& degrees);
+		void coord_polar_to_rect(const double& radius, const double& angle_degrees, double& x, double& y);
         std::string get_device_path();
         
     private:

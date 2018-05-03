@@ -9,7 +9,7 @@ include_directories(res)
 
 #create libbebop2cpp
 find_package(OpenCV REQUIRED)
-find_package(Boost COMPONENTS iostreams chrono date_time timer system filesystem log thread REQUIRED)
+find_package(Boost COMPONENTS chrono date_time timer system filesystem log thread REQUIRED)
 find_package(Eigen3 REQUIRED)
 
 # Needed for the Gnuplots examples
@@ -74,8 +74,8 @@ install(TARGETS bebop2cpp LIBRARY DESTINATION lib)
 install(FILES ${INCLUDE_FILES} DESTINATION include/bebop2cpp/)
 
 
-add_executable(SNAP_rudi SNAP/SNAP_rudi.cpp)
-target_link_libraries(SNAP_rudi bebop2cpp)
+add_executable(test_Navi SNAP/navi.cpp SNAP/test_navi.cpp)
+target_link_libraries(test_Navi bebop2cpp)
 
 
 #executable sample, may have to fiddle with the font weights if you want this to behave itself

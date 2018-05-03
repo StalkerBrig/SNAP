@@ -10,6 +10,8 @@ Description: Implentation of Scan.h.
 #include <unistd.h>
 #include <sys/wait.h>
 #include <cstdlib>
+#include <math.h>
+#include <fstream>
 
 /*The constructor reads the configuration file and fills in the class values. If you want to add a 
   configuration option, make sure it's in the correct format in the .config file and then add another else
@@ -22,7 +24,7 @@ Scan::Scan(){
     char val [1000];
 
     /*Use this when the val is a number. Convert to string first and then convert to something else
-    Just for ease*/
+      Just for ease*/
     std::string val_string;
 
     if (config != NULL){
@@ -35,16 +37,16 @@ Scan::Scan(){
 
                 devicepath.assign(val, strlen(val));
                 continue;                
-            
-            /*Number of scans for each call to scan. Default is 10*/        
+
+                /*Number of scans for each call to scan. Default is 10*/        
             }else if (strcmp(var, "numscansper") == 0){
-                
+
                 val_string.assign(val, strlen(val)); 
                 num_scans_per = stoi(val_string, NULL);
                 continue;
 
             }else if (strcmp(var, "motorspeed") == 0){
-                
+
                 val_string.assign(val, strlen(val));
                 motor_speed = stoi(val_string, NULL);
                 continue;
@@ -87,17 +89,36 @@ std::string Scan::get_device_path(){
 
 }
 
-int Scan:: perform_scan(){
-    
-        
+double Scan::DegreestoRadians(const double& degrees){
+
+    return ((degrees/180.0) * M_PI);
+
+}
+
+/*	
+ *	Post: the value of x and y has been changed to be the correct 
+ *	x and y values for the polar coordinate
+ *
+ */
+void Scan::coord_polar_to_rect( const double& radius, const double& angle_degrees, double& x, double& y ){
+	x = radius * cos( DegreestoRadians( angle_degrees ) );
+	y = radius * sin( DegreestoRadians( angle_degrees ) );
+}
+
+int Scan::perform_scan(std::ofstream& of, std::ofstream& nof){
+
+    double angle;
+    double y;
+    double x;
+
     try{
-        
-        /*Initalize sweep device and start the scanning process. Scanning is assured not to start until
-          the device is calibrated*/
-//        sweep::sweep device{devicepath.c_str()};
-        
+
+        /*	Initalize sweep device and start the scanning process. Scanning is 
+		 *	assured not to start until the device is calibrated 
+		 */
+
         sweep::sweep device{devicepath.c_str()};
-      
+
         if (device.get_motor_speed() != motor_speed) device.set_motor_speed(motor_speed);
         if (device.get_sample_rate() != sample_rate) device.set_sample_rate(sample_rate);
 
@@ -107,34 +128,34 @@ int Scan:: perform_scan(){
         for (int i = 0; i < num_scans_per; i++){
 
             const sweep::scan scan = device.get_scan();
-            std::cout << "Scan #" << i << ":" << std::endl;
 
             for (const sweep::sample& sample : scan.samples){
+//                std::cout << "angle " << (double)sample.angle/1000 << " distance " << sample.distance << " strength " << sample.signal_strength << std::endl;
+				if( sample.distance != 1 ){
+					//if the scanner detecs an error, the distance comes back as 1cm
+					angle = (double)sample.angle/1000;
+					coord_polar_to_rect(sample.distance, angle, x, y);
+				
+					if ( sample.distance/100.0 <= 4.0 && sample.distance/100.0 >= (-4.0) ){
+						//only keep data that is within a cirlce w/ radius 4.0m
 
-                std::cout << "angle " << sample.angle << " distance " << sample.distance << "strength " << sample.signal_strength << std::endl;
-
+						//data for octomaps
+						of << x/100.0;
+						of << " " << y/100.0 << " 0" << std::endl; 
+						
+						//data for the navi (in M)
+						nof << angle;
+						nof << " " << sample.distance/100.0 << " 0" << std::endl; 
+					}
+				}
             }
-
         }
 
         device.stop_scanning();
 
     } catch (const sweep::device_error& e){
-
         std::cerr << "Error: " << e.what() << std::endl;
     }
 
-
-
     return 0; 
-
-}
-
-
-int main (int argc, char** argv){
-
-    int scan_stat;
-    Scan *S = new Scan();
-    scan_stat = S->perform_scan();
-
 }
