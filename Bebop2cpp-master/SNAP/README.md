@@ -1,4 +1,4 @@
-#SNAP Navigation
+SNAP Navigation
 =============================================
 
 *Work in Progress*
