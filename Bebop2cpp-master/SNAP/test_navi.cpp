@@ -65,10 +65,12 @@ int main(int argc, char *argv[]) {
 	*/
 	
 	string file_name = argv[1];
-
+    
 	Navi navi;
-	navi.mainLoop( file_name );
 	
-		exit(0);
+    //the mainLoop is the navigation loop for going through hallways
+    navi.mainLoop( file_name );
+	
+	exit(0);
 }
 
